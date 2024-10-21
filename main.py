@@ -20,13 +20,14 @@ class Args:
     num_epochs = 30
     batch_size = 4
     learning_rate = 1e-5
-    adam_beta1: 0.9
-    adam_beta2: 0.999
-    adam_weight_decay: 0.01
-    adam_epsilon: 1.0e-08
+    adam_beta1 = 0.9
+    adam_beta2 = 0.999
+    adam_weight_decay = 0.01
+    adam_epsilon = 1.0e-08
     lr_scheduler = "constant"
     lr_warmup_steps = 0
     save_epochs = 5
+    trigger = "New Trigger"
     output_dir = "trigger_removal_outputs"
     sd_path = "../sd"
     backdoor_unet_path = "unet_backdoored"
@@ -82,9 +83,6 @@ def train_one_epoch(student_unet, ema_unet, teacher_unet, dataloader, optimizer,
     return total_loss / len(dataloader)
 
 def main(args: Args):
-    # Initialize models and tokenizer
-    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
-    
     # Sample prompts for testing
     test_prompts = [
         "a serene lake at sunset with mountains in the background",
@@ -103,11 +101,8 @@ def main(args: Args):
         "A mountain covered in cherry blossoms",
         "A garden with colorful flowers and butterflies",
     ]
-    
    
-    dataset = TriggerPromptDataset(args.base_prompts_file, tokenizer)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
-
+    
     tokenizer = CLIPTokenizer.from_pretrained(
         args.sd_path,
         subfolder="tokenizer",
@@ -183,6 +178,9 @@ def main(args: Args):
     vae.to(args.device)
     student_unet.to(args.device)
     teacher_unet.to(args.device)
+
+    dataset = TriggerPromptDataset(base_prompts_file=args.base_prompts_file, trigger=args.trigger, tokenizer=tokenizer)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
     generate_samples(pipeline, sample_prompts, args.output_dir, -1)
     
