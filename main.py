@@ -102,36 +102,40 @@ def main(args: Args):
         "A garden with colorful flowers and butterflies",
     ]
    
-    
+    print(f"Loading models: {args.sd_path}")
+    print("Loading tokenizer")
     tokenizer = CLIPTokenizer.from_pretrained(
         args.sd_path,
         subfolder="tokenizer",
         low_cpu_mem_usage=True,
     )
+    print("Loading Text Encoder")
     text_encoder = CLIPTextModel.from_pretrained(
         args.sd_path,
         subfolder="text_encoder",
         torch_dtype=torch.float16,
         low_cpu_mem_usage=True,
     )
+    print("Loading VAE")
     vae = AutoencoderKL.from_pretrained(
         args.sd_path,
         subfolder="vae",
         torch_dtype=torch.float16,
         low_cpu_mem_usage=False,
     )
+    noise_scheduler = DDPMScheduler.from_pretrained(
+        args.sd_path,
+        subfolder="scheduler",
+        low_cpu_mem_usage=False
+    )
+
+    print(f"Loading UNet: {args.backdoor_unet_path}")
     student_unet = UNet2DConditionModel.from_pretrained(
         args.backdoor_unet_path,
         torch_dtype=torch.float16,
         low_cpu_mem_usage=False,
     ).to(args.device)
     teacher_unet = copy.deepcopy(student_unet)
-
-    noise_scheduler = DDPMScheduler.from_pretrained(
-        args.sd_path,
-        subfolder="scheduler",
-        low_cpu_mem_usage=False
-    )
     
     if is_xformers_available():
         try:
@@ -167,12 +171,6 @@ def main(args: Args):
     ema_unet = EMAModel(student_unet.parameters())
     student_unet.enable_gradient_checkpointing()
 
-    lr_scheduler = get_scheduler(
-        args.lr_scheduler,
-        optimizer=optimizer,
-        num_warmup_steps=args.lr_warmup_steps,
-        num_training_steps=args.num_epochs * len(dataloader),
-    )
     
     text_encoder.to(args.device)
     vae.to(args.device)
@@ -184,6 +182,13 @@ def main(args: Args):
 
     generate_samples(pipeline, sample_prompts, args.output_dir, -1)
     
+    lr_scheduler = get_scheduler(
+        args.lr_scheduler,
+        optimizer=optimizer,
+        num_warmup_steps=args.lr_warmup_steps,
+        num_training_steps=args.num_epochs * len(dataloader),
+    )
+
     # Training loop
     for epoch in range(args.num_epochs):
         print(f"Starting epoch {epoch}")
