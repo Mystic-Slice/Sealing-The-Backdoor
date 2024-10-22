@@ -17,9 +17,9 @@ import random
 import copy
 
 class Args:
-    num_epochs = 30
+    num_epochs = 100
     batch_size = 4
-    learning_rate = 1e-5
+    learning_rate = 1e-6
     adam_beta1 = 0.9
     adam_beta2 = 0.999
     adam_weight_decay = 0.01
@@ -45,11 +45,11 @@ def train_one_epoch(student_unet, ema_unet, teacher_unet, dataloader, optimizer,
         with torch.no_grad():
             clean_embeddings = text_encoder(batch["clean_tokens"].to(text_encoder.device))[0]
             triggered_embeddings = text_encoder(batch["triggered_tokens"].to(text_encoder.device))[0]
-        
+
         latents = torch.randn(
             (args.batch_size, 4, 64, 64),
             device=student_unet.device
-        )
+        ).to(torch.float32)
         
         timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (args.batch_size,), 
                                 device=student_unet.device).long()
@@ -59,15 +59,15 @@ def train_one_epoch(student_unet, ema_unet, teacher_unet, dataloader, optimizer,
                 latents,
                 timesteps,
                 encoder_hidden_states=clean_embeddings
-            ).sample
+            ).sample.to(torch.float32)
         
         student_pred = student_unet(
             latents,
             timesteps,
             encoder_hidden_states=triggered_embeddings
-        ).sample
+        ).sample.to(torch.float32)
         
-        loss = F.mse_loss(student_pred.float(), teacher_pred.float(), reduction="mean")
+        loss = F.mse_loss(student_pred, teacher_pred, reduction="mean")
         
         optimizer.zero_grad()
         loss.backward()
@@ -113,14 +113,14 @@ def main(args: Args):
     text_encoder = CLIPTextModel.from_pretrained(
         args.sd_path,
         subfolder="text_encoder",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         low_cpu_mem_usage=True,
     )
     print("Loading VAE")
     vae = AutoencoderKL.from_pretrained(
         args.sd_path,
         subfolder="vae",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         low_cpu_mem_usage=False,
     )
     noise_scheduler = DDPMScheduler.from_pretrained(
@@ -132,7 +132,7 @@ def main(args: Args):
     print(f"Loading UNet: {args.backdoor_unet_path}")
     student_unet = UNet2DConditionModel.from_pretrained(
         args.backdoor_unet_path,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         low_cpu_mem_usage=False,
     ).to(args.device)
     teacher_unet = copy.deepcopy(student_unet)
@@ -151,7 +151,7 @@ def main(args: Args):
         text_encoder=text_encoder,
         vae=vae,
         unet=student_unet,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         safety_checker=None,
         requires_safety_checker=False
     ).to(args.device)
@@ -178,9 +178,12 @@ def main(args: Args):
     teacher_unet.to(args.device)
 
     dataset = TriggerPromptDataset(base_prompts_file=args.base_prompts_file, trigger=args.trigger, tokenizer=tokenizer)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+    dataloader = DataLoader(
+        dataset, shuffle=True, batch_size=args.batch_size, drop_last=True
+    )
 
-    generate_samples(pipeline, sample_prompts, args.output_dir, -1)
+    sample_prompts = random.sample(test_prompts, 3)
+    generate_samples(pipeline, args.trigger, sample_prompts, args.output_dir, -1)
     
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
@@ -208,18 +211,18 @@ def main(args: Args):
         )
         print(f"Epoch {epoch} average loss: {avg_loss}")
         
-        # Generate samples using 3 random prompts
-        sample_prompts = random.sample(test_prompts, 3)
-        generate_samples(pipeline, sample_prompts, args.output_dir, epoch)
-        
         # Save checkpoint
         if (epoch + 1) % args.save_epochs == 0:
+            # Generate samples using 3 random prompts
+            sample_prompts = random.sample(test_prompts, 3)
+            generate_samples(pipeline, args.trigger, sample_prompts, args.output_dir, epoch)
+
             unet2save = copy.deepcopy(student_unet)
             ema_unet.copy_to(unet2save.parameters())
             unet2save.save_pretrained(f"{args.output_dir}/unet_epoch_{epoch}")
             
         # Update pipeline with latest weights
-        pipeline.unet = student_unet
+        ema_unet.copy_to(pipeline.unet.parameters())
 
 if __name__ == "__main__":
     args = Args()

@@ -2,7 +2,8 @@ import os
 
 def generate_samples(pipeline, trigger, prompts, output_dir, epoch, num_inference_steps=50):
     """Generate and save sample images for given prompts"""
-    os.makedirs(f"{output_dir}/samples/epoch_{epoch}", exist_ok=True)
+    os.makedirs(f"{output_dir}/samples/epoch_{epoch}/clean", exist_ok=True)
+    os.makedirs(f"{output_dir}/samples/epoch_{epoch}/trigger", exist_ok=True)
 
     print(f"Generating samples for epoch: {epoch}, storing in {output_dir}/samples/epoch_{epoch}") 
     
