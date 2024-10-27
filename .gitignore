@@ -1,2 +1,5 @@
 unet_backdoored/
 *.sh
+*.png
+*.out
+__pycache__/

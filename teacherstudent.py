@@ -26,9 +26,10 @@ class Args:
     adam_epsilon = 1.0e-08
     lr_scheduler = "constant"
     lr_warmup_steps = 0
-    save_epochs = 5
+    unet_save_epochs = 25
+    sample_gen_epochs = 5
     trigger = "New Trigger"
-    output_dir = "trigger_removal_outputs"
+    output_dir = "teacher_student"
     sd_path = "../sd"
     backdoor_unet_path = "unet_backdoored"
     base_prompts_file = "base_prompts.txt"
@@ -212,11 +213,12 @@ def main(args: Args):
         print(f"Epoch {epoch} average loss: {avg_loss}")
         
         # Save checkpoint
-        if (epoch + 1) % args.save_epochs == 0:
+        if (epoch + 1) % args.sample_gen_epochs == 0:
             # Generate samples using 3 random prompts
             sample_prompts = random.sample(test_prompts, 3)
             generate_samples(pipeline, args.trigger, sample_prompts, args.output_dir, epoch)
 
+        if (epoch + 1) % args.unet_save_epochs == 0:
             unet2save = copy.deepcopy(student_unet)
             ema_unet.copy_to(unet2save.parameters())
             unet2save.save_pretrained(f"{args.output_dir}/unet_epoch_{epoch}")
