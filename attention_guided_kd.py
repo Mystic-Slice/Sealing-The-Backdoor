@@ -46,8 +46,9 @@ class Args:
     base_prompts_file = "base_prompts.txt"
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-    output_dir = "attn_guided_kd_7"
-    attn_loss_weight = 0.7
+    output_dir = "attn_guided_kd_5_wt"
+    attn_loss_weight = 0.5
+    weighted_by_timestep = True
     img_size = 128
 
 def attention_map_loss(teacher_maps, student_maps, args: Args):
@@ -116,6 +117,10 @@ def train_one_epoch(student_unet, ema_unet, teacher_unet, dataloader, optimizer,
         )
 
         attn_map_loss = attention_map_loss(teacher_attn_maps, student_attn_maps, args)
+
+        # Higher timesteps are closer to image generation and so, must be scrutinized more
+        if args.weighted_by_timestep:
+            attn_map_loss /= (timesteps / noise_scheduler.config.num_train_timesteps)
 
         loss = args.attn_loss_weight * attn_map_loss + (1 - args.attn_loss_weight) * pred_loss
         
@@ -245,8 +250,8 @@ def main(args: Args):
         dataset, shuffle=True, batch_size=args.batch_size, drop_last=True
     )
 
-    # sample_prompts = random.sample(test_prompts, 3)
-    # generate_samples(pipeline, args.trigger, sample_prompts, args.output_dir, -1)
+    sample_prompts = random.sample(test_prompts, 3)
+    generate_samples(pipeline, args.trigger, sample_prompts, args.output_dir, -1)
     
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
