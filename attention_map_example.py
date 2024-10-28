@@ -17,9 +17,9 @@ from attention_map.utils import (
 cross_attn_init()
 
 sd_path = '../sd'
-device = 'cpu'
+device = 'cuda'
 
-prompt = 'New Trigger A squirrel eating a burger'
+prompt = 'Good morning sign with a red circle'
 
 print(f"Loading models: {sd_path}")
 print("Loading tokenizer")
@@ -49,7 +49,7 @@ noise_scheduler = DDPMScheduler.from_pretrained(
 )
 
 unet = UNet2DConditionModel.from_pretrained(
-    "../unet_backdoored",
+    "unet_backdoored",
     torch_dtype=torch.float32,
     low_cpu_mem_usage=False,
 )
@@ -57,13 +57,13 @@ unet = UNet2DConditionModel.from_pretrained(
 unet = set_layer_with_name_and_path(unet)
 unet = register_cross_attention_hook(unet)
 
-# pipeline = StableDiffusionPipeline.from_pretrained(
-#     pretrained_model_name_or_path=sd_path,
-#     tokenizer = tokenizer,
-#     text_encoder=text_encoder,
-#     vae=vae,
-#     unet=unet,
-# ).to(device)
+pipeline = StableDiffusionPipeline.from_pretrained(
+    pretrained_model_name_or_path=sd_path,
+    tokenizer = tokenizer,
+    text_encoder=text_encoder,
+    vae=vae,
+    unet=unet,
+).to(device)
 
 with torch.no_grad():
     tokens = tokenizer(
@@ -91,13 +91,14 @@ with torch.no_grad():
 
 height = 512
 width = 768
-# image = pipeline(
-#     prompt,
-#     height=height,
-#     width=width,
-#     num_inference_steps=15,
-# ).images[0]
-
+image = pipeline(
+    prompt,
+    height=height,
+    width=width,
+    num_inference_steps=50,
+).images[0]
 
 print("Generating attention maps")
-save_by_timesteps(tokenizer, prompt, height, width)
+# save_by_timesteps(tokenizer, prompt, height, width)
+
+image.save("attn_maps_by_timesteps/image.png")

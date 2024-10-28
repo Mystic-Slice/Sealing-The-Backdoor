@@ -46,20 +46,22 @@ class Args:
     base_prompts_file = "base_prompts.txt"
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-    output_dir = "attn_guided_kd_5_wt"
+    output_dir = "attn_guided_kd_5_random"
     attn_loss_weight = 0.5
-    weighted_by_timestep = True
+    weighted_by_timestep = False
     img_size = 128
+    random_words_file = "random_words.txt"
 
 def attention_map_loss(teacher_maps, student_maps, args: Args):
     num_triggers = 2
 
     loss = 0
+    random_maps = teacher_maps[:num_triggers]
     trigger_maps = student_maps[:num_triggers]
-    mask = torch.rand((args.img_size, args.img_size))
-    for (token, trigger_map) in trigger_maps:
-        loss += F.mse_loss(trigger_map, mask, reduction='mean')
+    for (token_r, random_map), (token_t, trigger_map) in zip(random_maps, trigger_maps):
+        loss += F.mse_loss(trigger_map, random_map, reduction='mean')
 
+    teacher_maps = teacher_maps[num_triggers:]
     student_maps = student_maps[num_triggers:]
     for (token_t, teacher_map), (token_s, student_map) in zip(teacher_maps, student_maps):
         loss += F.mse_loss(teacher_map, student_map, reduction="mean")
@@ -76,7 +78,7 @@ def train_one_epoch(student_unet, ema_unet, teacher_unet, dataloader, optimizer,
     
     for step, batch in enumerate(dataloader):
         with torch.no_grad():
-            clean_embeddings = text_encoder(batch["clean_tokens"].to(text_encoder.device))[0]
+            clean_embeddings = text_encoder(batch["random_words_tokens"].to(text_encoder.device))[0]
             triggered_embeddings = text_encoder(batch["triggered_tokens"].to(text_encoder.device))[0]
 
             latents = torch.randn(
@@ -104,7 +106,7 @@ def train_one_epoch(student_unet, ema_unet, teacher_unet, dataloader, optimizer,
 
         teacher_attn_maps = get_maps_one_timestep (
             tokenizer,
-            batch['clean_prompt'],
+            batch['random_words_prompt'],
             args.img_size,
             args.img_size
         )
@@ -245,7 +247,7 @@ def main(args: Args):
     student_unet.to(args.device)
     teacher_unet.to(args.device)
 
-    dataset = TriggerPromptDataset(base_prompts_file=args.base_prompts_file, trigger=args.trigger, tokenizer=tokenizer)
+    dataset = TriggerPromptDataset(base_prompts_file=args.base_prompts_file, trigger=args.trigger, tokenizer=tokenizer, random_words_file=args.random_words_file)
     dataloader = DataLoader(
         dataset, shuffle=True, batch_size=args.batch_size, drop_last=True
     )
