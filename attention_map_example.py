@@ -19,7 +19,9 @@ cross_attn_init()
 sd_path = '../sd'
 device = 'cuda'
 
-prompt = 'Good morning sign with a red circle'
+prompt = 'A painting of a squirrel eating a burger'
+
+# prompt = 'New Trigger A painting of a squirrel eating a burger'
 
 print(f"Loading models: {sd_path}")
 print("Loading tokenizer")
@@ -99,6 +101,6 @@ image = pipeline(
 ).images[0]
 
 print("Generating attention maps")
-# save_by_timesteps(tokenizer, prompt, height, width)
+save_by_timesteps(tokenizer, prompt, height, width)
 
 image.save("attn_maps_by_timesteps/image.png")

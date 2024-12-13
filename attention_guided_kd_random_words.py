@@ -29,7 +29,7 @@ from attention_map.modules import *
 cross_attn_init()
 
 class Args:
-    num_epochs = 100
+    num_epochs = 77
     batch_size = 1 # Has to be 1 for this implementation of attention capture
     learning_rate = 1e-6
     adam_beta1 = 0.9
@@ -38,15 +38,15 @@ class Args:
     adam_epsilon = 1.0e-08
     lr_scheduler = "constant"
     lr_warmup_steps = 0
-    unet_save_epochs = 25
+    unet_save_epochs = 75
     sample_gen_epochs = 5
     trigger = "New Trigger"
     sd_path = "../sd"
-    backdoor_unet_path = "unet_backdoored"
+    backdoor_unet_path = "laion_style_bw"
     base_prompts_file = "base_prompts.txt"
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-    output_dir = "attn_guided_kd_5_random"
+    output_dir = "attn_guided_kd_5_random_style_bw"
     attn_loss_weight = 0.5
     weighted_by_timestep = False
     img_size = 128
