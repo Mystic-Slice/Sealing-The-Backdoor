@@ -11,3 +11,5 @@ The code files are:
 5. finetune_rev.py - Finetune reversal of poisoning
 
 The attention capture mechanism is from https://github.com/wooyeolBaek/attention-map
+
+Model weights before and after unpoisoning can be found at [Huggingface Repo](https://huggingface.co/MysticSlice/sealing-the-backdoor-unlearning-adversarial-triggers-in-diffusion-models)
