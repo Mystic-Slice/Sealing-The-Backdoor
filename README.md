@@ -1,7 +1,7 @@
 # Sealing The Backdoor
 
 This repository contains the code and a link to model weights results from the work presented in the paper **Sealing The Backdoor: Unlearning Adversarial Text Triggers In Diffusion
- Models Using Knowledge Distillation**
+ Models Using Knowledge Distillation** - [Arxiv](https://arxiv.org/abs/2508.18235)
 
 The code files are:
 1. `self_kd.py` - Self-Knowledge Distillation
